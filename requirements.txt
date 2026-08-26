@@ -1,0 +1,9 @@
+
+pandas
+numpy
+ prophet
+ fastapi
+ uvicorn
+ neo4j
+ streamlit
+ twilio
