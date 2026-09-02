@@ -1,9 +1,9 @@
 """
-Simulated hospital data generator.
+BloodLink Network - synthetic hospital blood inventory generator.
 
-Generates 90 days of daily blood-unit inventory and demand data for a
-network of fake hospitals. This stands in for real hospital data until
-you get access to the real thing (or as your permanent demo dataset).
+Generates 90 days of daily blood inventory data (opening stock, demand,
+received, closing stock) for a network of fake hospitals, one row per
+hospital/blood-type/day.
 
 Run: python data_sim/generate_data.py
 Output: data/hospital_blood_data.csv
@@ -11,76 +11,98 @@ Output: data/hospital_blood_data.csv
 
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# ---- Config ----
 NUM_DAYS = 90
-BLOOD_TYPES = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
 
-# Each hospital: (name, city, lat, lon, avg_daily_demand, base_stock)
-# Coordinates are real approximate locations so distance calcs later are meaningful.
+BLOOD_TYPE_WEIGHTS = {
+    "O+": 0.35, "O-": 0.07,
+    "A+": 0.30, "A-": 0.06,
+    "B+": 0.10, "B-": 0.03,
+    "AB+": 0.06, "AB-": 0.03,
+}
+
+# name, city, lat, lon, hospital_type, bed_capacity, avg_daily_demand
 HOSPITALS = [
-    ("City General Hospital",     "Hyderabad",  17.3850, 78.4867, 25, 400),
-    ("Sunrise Multispecialty",    "Hyderabad",  17.4239, 78.4738, 15, 250),
-    ("Care Trust Hospital",       "Vijayawada", 16.5062, 80.6480, 18, 280),
-    ("Apex Medical Center",       "Vijayawada", 16.5193, 80.6305, 12, 200),
-    ("Lifeline Hospital",         "Guntur",     16.3067, 80.4365, 10, 180),
-    ("Metro Health Institute",    "Hyderabad",  17.4483, 78.3915, 20, 320),
-    ("St. Mary's Medical College","Vijayawada", 16.4900, 80.6100, 22, 350),
-    ("Regional Trauma Center",    "Guntur",     16.3150, 80.4500, 14, 220),
+    ("City General Hospital",      "Hyderabad",  17.3850, 78.4867, "General",        400, 25),
+    ("Sunrise Multispecialty",     "Hyderabad",  17.4239, 78.4738, "Multispecialty", 300, 15),
+    ("Care Trust Hospital",        "Vijayawada", 16.5062, 80.6480, "General",        350, 18),
+    ("Apex Medical Center",        "Vijayawada", 16.5193, 80.6305, "Multispecialty", 250, 12),
+    ("Lifeline Hospital",          "Guntur",     16.3067, 80.4365, "General",        200, 10),
+    ("Metro Health Institute",     "Hyderabad",  17.4483, 78.3915, "Multispecialty", 450, 20),
+    ("St. Mary's Medical College", "Vijayawada", 16.4900, 80.6100, "Teaching",       500, 22),
+    ("Regional Trauma Center",     "Guntur",     16.3150, 80.4500, "Trauma",         600, 14),
 ]
 
+HOSPITAL_TYPE_MULTIPLIER = {"General": 1.0, "Multispecialty": 1.05, "Teaching": 1.10, "Trauma": 1.20}
 
-def generate_hospital_series(base_stock, avg_demand, seed):
-    """Generate one hospital's daily stock + demand with seasonality,
-    weekend dips, and occasional shortage/surge events."""
+
+def generate_blood_type_series(avg_demand, blood_weight, hospital_type, seed):
+    """Generate 90 days of opening/demand/received/closing stock for one
+    hospital + one blood type."""
     rng = np.random.default_rng(seed)
     days = pd.date_range(end=datetime.today(), periods=NUM_DAYS, freq="D")
+    type_mult = HOSPITAL_TYPE_MULTIPLIER[hospital_type]
 
-    stock = np.zeros(NUM_DAYS)
+    opening = np.zeros(NUM_DAYS)
     demand = np.zeros(NUM_DAYS)
-    stock[0] = base_stock
+    received = np.zeros(NUM_DAYS)
+    closing = np.zeros(NUM_DAYS)
+    emergency = np.zeros(NUM_DAYS, dtype=int)
+
+    opening[0] = avg_demand * 14 * blood_weight  # ~2 weeks of stock to start
 
     for i, day in enumerate(days):
-        # Weekly seasonality: more demand mid-week, less on weekends
-        weekday_factor = 1.15 if day.weekday() < 5 else 0.8
-
-        # Occasional surge event (accident cluster, outbreak) - 4% chance/day
-        surge = 2.5 if rng.random() < 0.04 else 1.0
-
-        daily_demand = max(0, rng.normal(avg_demand * weekday_factor * surge, avg_demand * 0.2))
-        daily_supply = max(0, rng.normal(avg_demand * 1.05, avg_demand * 0.25))  # donations/restock
-
-        demand[i] = round(daily_demand)
         if i > 0:
-            stock[i] = max(0, stock[i - 1] - demand[i] + daily_supply)
+            opening[i] = closing[i - 1]
 
-    return days, stock.round().astype(int), demand.astype(int)
+        weekday_factor = 1.15 if day.weekday() < 5 else 0.80
+        emergency[i] = int(rng.random() < 0.04)
+        surge_factor = 2.5 if emergency[i] else 1.0
+
+        expected_demand = avg_demand * type_mult * blood_weight * weekday_factor * surge_factor
+        demand[i] = max(0, round(rng.normal(expected_demand, max(1, expected_demand * 0.20))))
+
+        expected_supply = avg_demand * blood_weight * 1.05
+        received[i] = max(0, round(rng.normal(expected_supply, max(1, expected_supply * 0.25))))
+
+        closing[i] = max(0, opening[i] - demand[i] + received[i])
+
+    return days, opening.round().astype(int), demand.astype(int), received.astype(int), closing.round().astype(int), emergency
 
 
 def main():
     rows = []
-    for idx, (name, city, lat, lon, avg_demand, base_stock) in enumerate(HOSPITALS):
-        days, stock, demand = generate_hospital_series(base_stock, avg_demand, seed=idx)
-        for i, day in enumerate(days):
-            # Split total stock/demand across blood types (not equal - O+ and A+ dominate)
-            weights = np.array([0.35, 0.07, 0.30, 0.06, 0.10, 0.03, 0.06, 0.03])
-            for bt, w in zip(BLOOD_TYPES, weights):
+    for h_idx, (name, city, lat, lon, htype, beds, avg_demand) in enumerate(HOSPITALS):
+        for b_idx, (blood_type, weight) in enumerate(BLOOD_TYPE_WEIGHTS.items()):
+            seed = h_idx * 100 + b_idx
+            days, opening, demand, received, closing, emergency = generate_blood_type_series(
+                avg_demand, weight, htype, seed
+            )
+            for i, day in enumerate(days):
                 rows.append({
                     "date": day.strftime("%Y-%m-%d"),
                     "hospital": name,
                     "city": city,
                     "lat": lat,
                     "lon": lon,
-                    "blood_type": bt,
-                    "units_available": int(round(stock[i] * w)),
-                    "units_demanded": int(round(demand[i] * w)),
+                    "hospital_type": htype,
+                    "bed_capacity": beds,
+                    "blood_type": blood_type,
+                    "opening_stock": int(opening[i]),
+                    "units_demanded": int(demand[i]),
+                    "units_received": int(received[i]),
+                    "closing_stock": int(closing[i]),
+                    "emergency_event": int(emergency[i]),
                 })
 
     df = pd.DataFrame(rows)
     df.to_csv("data/hospital_blood_data.csv", index=False)
+
     print(f"Generated {len(df)} rows across {len(HOSPITALS)} hospitals -> data/hospital_blood_data.csv")
     print(df.head(10))
+    print("\nShape:", df.shape)
+    print("Emergency days flagged:", df["emergency_event"].sum())
 
 
 if __name__ == "__main__":
