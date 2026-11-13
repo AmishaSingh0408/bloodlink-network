@@ -130,9 +130,10 @@ def train_random_forest(train):
     y_train = train["units_demanded"]
 
     model = RandomForestRegressor(
-        n_estimators=200,
+        n_estimators=50,
         random_state=42,
-        max_depth=10
+        max_depth=10,
+        n_jobs=-1
     )
 
     model.fit(X_train, y_train)
