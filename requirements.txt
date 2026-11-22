@@ -1,9 +1,10 @@
 
 pandas
 numpy
- prophet
- fastapi
- uvicorn
- neo4j
- streamlit
- twilio
+scikit-learn
+fastapi
+uvicorn
+streamlit
+prophet
+neo4j
+twilio
