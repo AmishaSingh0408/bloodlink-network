@@ -308,7 +308,7 @@ BLOODLINK NETWORK · 2026
 
 
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = "https://bloodlink-network.onrender.com"
 @st.cache_data(ttl=3600)
 def get_matching_data():
     response = requests.get(
