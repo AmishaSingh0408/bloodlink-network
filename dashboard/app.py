@@ -4,6 +4,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+from datetime import datetime
 
 # --------------------------------------------------
 # PAGE CONFIGURATION
@@ -14,6 +15,298 @@ st.set_page_config(
     page_icon="🩸",
     layout="wide"
 )
+
+
+# --------------------------------------------------
+# BLOODLINK PREMIUM UI THEME
+# --------------------------------------------------
+
+st.markdown("""
+<style>
+
+/* Main application background */
+.stApp {
+    background-color: #F7F3EF;
+    color: #302630;
+}
+
+/* Main content spacing */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+    max-width: 1450px;
+}
+
+/* Main headings */
+h1 {
+    color: #652D4B !important;
+    font-weight: 750 !important;
+    letter-spacing: -1px;
+}
+
+h2, h3 {
+    color: #652D4B !important;
+    font-weight: 650 !important;
+}
+
+/* Premium KPI cards */
+[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border: 1px solid #EADDE3;
+    border-top: 4px solid #89516E;
+    border-radius: 16px;
+    padding: 24px 22px;
+    min-height: 125px;
+    box-shadow: 0 5px 18px rgba(75, 35, 55, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 9px 24px rgba(75, 35, 55, 0.11);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #806B77 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #652D4B !important;
+    font-size: 32px !important;
+    font-weight: 750 !important;
+}
+
+/* Metric labels */
+[data-testid="stMetricLabel"] {
+    color: #806B77 !important;
+    font-weight: 600;
+}
+
+/* Metric values */
+[data-testid="stMetricValue"] {
+    color: #652D4B !important;
+    font-weight: 750;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #652D4B;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    background-color: #81415F;
+    color: #FFFFFF;
+    border: none;
+}
+
+/* Dataframes */
+[data-testid="stDataFrame"] {
+    background: #FFFFFF;
+    border-radius: 12px;
+    border: 1px solid #EADDE3;
+}
+
+/* Select boxes */
+[data-testid="stSelectbox"] {
+    background-color: #FFFFFF;
+}
+
+/* Dividers */
+hr {
+    border-color: #EADDE3;
+}
+
+/* Captions */
+.stCaption {
+    color: #8A7580;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #652D4B;
+}
+
+[data-testid="stSidebar"] * {
+    color: #FFFFFF;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+
+
+
+
+# --------------------------------------------------
+# CUSTOM FIXED BLOODLINK SIDEBAR
+# --------------------------------------------------
+
+
+st.markdown("""
+<style>
+[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+
+/* Main content layout */
+[data-testid="stMainBlockContainer"] {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding-left: 330px !important;
+    padding-right: 30px !important;
+    padding-top: 2rem !important;
+    padding-bottom: 3rem !important;
+    margin-left: 0 !important;
+}
+
+/* Keep the main area full width */
+[data-testid="stAppViewContainer"] .main {
+    width: 100% !important;
+    margin-left: 0 !important;
+}
+
+.bloodlink-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    background: #652D4B;
+    padding: 30px 18px;
+    z-index: 999999;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+.bloodlink-brand {
+    color: white;
+    font-size: 27px;
+    font-weight: 750;
+    margin-bottom: 5px;
+}
+
+.bloodlink-subtitle {
+    color: #E8C9D7;
+    font-size: 12px;
+    margin-bottom: 45px;
+}
+
+.bloodlink-nav-label {
+    color: #D9B8C8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin: 25px 0 12px 8px;
+}
+
+.bloodlink-nav-item {
+    display: block;
+    text-decoration: none !important;
+    color: #F7EAF0 !important;
+    padding: 12px 14px;
+    margin: 5px 0;
+    border-radius: 9px;
+    font-size: 14px;
+    transition: background 0.2s ease;
+}
+
+.bloodlink-nav-item:hover {
+    background: #89516E;
+    color: white !important;
+}
+
+/* Active navigation highlighting */
+.bloodlink-nav-item:hover {
+    background: #89516E;
+    color: white !important;
+}
+
+/* Highlight the selected section */
+body:not(:has(#inventory:target, #shortages:target, #forecasting:target, #suppliers:target, #transfers:target))
+.bloodlink-nav-item[href="#overview"],
+body:has(#inventory:target) .bloodlink-nav-item[href="#inventory"],
+body:has(#shortages:target) .bloodlink-nav-item[href="#shortages"],
+body:has(#forecasting:target) .bloodlink-nav-item[href="#forecasting"],
+body:has(#suppliers:target) .bloodlink-nav-item[href="#suppliers"],
+body:has(#transfers:target) .bloodlink-nav-item[href="#transfers"] {
+    background: #89516E;
+    color: white !important;
+    font-weight: 700;
+}
+
+.bloodlink-footer {
+    position: absolute;
+    bottom: 25px;
+    color: #E8C9D7;
+    font-size: 11px;
+}
+html {
+    scroll-behavior: smooth;
+}
+
+[id] {
+    scroll-margin-top: 30px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+
+st.markdown("""
+<div class="bloodlink-sidebar">
+<div class="bloodlink-brand">🩸 BloodLink</div>
+<div class="bloodlink-subtitle">
+Hospital Intelligence Platform
+</div>
+
+
+<div class="bloodlink-nav-label">WORKSPACE</div>
+
+<a href="#overview" class="bloodlink-nav-item ">
+▦ &nbsp; Overview
+</a>
+
+<a href="#inventory" class="bloodlink-nav-item">
+🏥 &nbsp; Hospital Inventory
+</a>
+
+<a href="#shortages" class="bloodlink-nav-item">
+🚨 &nbsp; Shortage Monitoring
+</a>
+
+<a href="#forecasting" class="bloodlink-nav-item">
+📈 &nbsp; Demand Forecasting
+</a>
+
+<a href="#suppliers" class="bloodlink-nav-item">
+🔗 &nbsp; Supplier Network
+</a>
+
+<a href="#transfers" class="bloodlink-nav-item">
+↔ &nbsp; Transfer Recommendations
+</a>
+
+<div class="bloodlink-footer">
+BLOODLINK NETWORK · 2026
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+
+
+
 
 API_URL = "http://127.0.0.1:8000"
 @st.cache_data(ttl=3600)
@@ -44,20 +337,77 @@ def calculate_severity(row):
         return "Low"
 
 
-# --------------------------------------------------
-# DASHBOARD HEADER
-# --------------------------------------------------
 
-st.title("🩸 BloodLink Network")
-st.subheader("AI-Powered Hospital Blood Inventory & Forecasting")
+# --------------------------------------------------
+# DASHBOARD WELCOME HEADER
+# --------------------------------------------------
 
 st.markdown(
-    "Monitor hospital blood inventory, predict future demand, "
-    "detect potential shortages, and coordinate blood transfers."
+    '<div id="overview"></div>',
+    unsafe_allow_html=True
 )
 
+header_col1, header_col2 = st.columns([3, 1])
+
+with header_col1:
+    st.markdown(
+        """
+        <div style="padding: 10px 0 5px 0;">
+            <div style="
+                color: #9B6682;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+            ">
+                HOSPITAL OPERATIONS DASHBOARD
+            </div>
+            <h1 style="
+                color: #652D4B;
+                font-size: 34px;
+                margin: 10px 0;
+            ">
+                Welcome to BloodLink 🩸
+            </h1>
+            <p style="color: #806B77; font-size: 15px;">
+                Monitor inventory, anticipate shortages and coordinate
+                hospital blood supply.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+with header_col2:
+    st.markdown(
+        f"""
+        <div style="
+            text-align: right;
+            padding-top: 20px;
+        ">
+            <div style="color: #806B77; font-size: 13px;">
+                TODAY
+            </div>
+            <div style="
+                color: #652D4B;
+                font-size: 17px;
+                font-weight: 700;
+            ">
+                {datetime.now().strftime("%d %b %Y")}
+            </div>
+            <div style="
+                color: #287D61;
+                font-size: 12px;
+                margin-top: 10px;
+            ">
+                ● DEMO SYSTEM
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 st.caption(
-    "Prototype using simulated hospital data. "
+    "Prototype powered by simulated hospital data. "
     "Forecasts and alerts are not clinically validated."
 )
 
@@ -110,7 +460,10 @@ try:
         # ------------------------------------------
         # HOSPITAL INVENTORY
         # ------------------------------------------
-
+        st.markdown(
+            '<div id="inventory"></div>',
+             unsafe_allow_html=True
+        )
         st.subheader("Hospital Blood Inventory")
 
         st.dataframe(
@@ -132,22 +485,51 @@ try:
 
         st.subheader("Blood Group Stock Distribution")
 
+        
+        # Calculate total stock for each blood group
         blood_stock = (
             inventory.groupby("blood_type")["closing_stock"]
             .sum()
             .reset_index()
+            .sort_values("closing_stock", ascending=False)
         )
 
+        # Identify highest and lowest stock groups
+        highest_stock = blood_stock.iloc[0]
+        lowest_stock = blood_stock.iloc[-1]
+
+        col1, col2 = st.columns(2)
+
+        col1.metric(
+            "Highest Stock Group",
+            highest_stock["blood_type"],
+            f'{int(highest_stock["closing_stock"])} units'
+        )
+
+        col2.metric(
+            "Lowest Stock Group",
+            lowest_stock["blood_type"],
+            f'{int(lowest_stock["closing_stock"])} units',
+            delta_color="off"
+        )
+
+        # Display stock distribution
         st.bar_chart(
             blood_stock,
             x="blood_type",
-            y="closing_stock"
+            y="closing_stock",
+            color="#89516E",
+            use_container_width=True
         )
+
 
         # ------------------------------------------
         # HOSPITAL SHORTAGE MONITORING
         # ------------------------------------------
-
+        st.markdown(
+            '<div id="shortages"></div>',
+            unsafe_allow_html=True
+        )
         st.divider()
 
         st.header("🚨 Hospital Shortage Monitoring")
@@ -175,52 +557,88 @@ try:
                 )
 
                 
-            # Calculate shortage severity
-            shortages["severity"] = shortages.apply(
-                  calculate_severity,
-                  axis=1
-              )
+                # Calculate shortage severity
+                shortages["severity"] = shortages.apply(
+                    calculate_severity,
+                    axis=1
+                )
 
-              # Add visual indicators
-            severity_icons = {
-                  "Critical": "🔴 Critical",
-                  "High": "🟠 High",
-                  "Medium": "🟡 Medium",
-                  "Low": "🟢 Low"
-              }
+                # Add visual indicators
+                severity_icons = {
+                    "Critical": "🔴 Critical",
+                    "High": "🟠 High",
+                    "Medium": "🟡 Medium",
+                    "Low": "🟢 Low"
+                }
 
-            shortages["severity"] = shortages["severity"].map(
-                  severity_icons
-              )
+                shortages["severity"] = shortages["severity"].map(
+                    severity_icons
+                )
+                
+                # Shortage overview metrics
+                total_hospitals_affected = shortages["hospital"].nunique()
+                critical_count = (shortages["severity"] == "🔴 Critical").sum()
+                high_count = (shortages["severity"] == "🟠 High").sum()
+                affected_blood_groups = shortages["blood_type"].nunique()
 
-              # Display most urgent shortages first
-            severity_order = {
-                  "🔴 Critical": 1,
-                  "🟠 High": 2,
-                  "🟡 Medium": 3,
-                  "🟢 Low": 4
-              }
+                st.subheader("Shortage Overview")
 
-            shortages["priority"] = shortages["severity"].map(
-                  severity_order
-              )
+                col1, col2, col3, col4 = st.columns(4)
 
-            shortages = shortages.sort_values("priority")
+                col1.metric("Hospitals Affected", total_hospitals_affected)
+                col2.metric("Critical Shortages", int(critical_count))
+                col3.metric("High Shortages", int(high_count))
+                col4.metric("Blood Groups Affected", affected_blood_groups)
 
-            st.dataframe(
-                  shortages[
-                      [
-                          "hospital",
-                          "blood_type",
-                          "closing_stock",
-                          "safety_stock",
-                          "average_daily_demand",
-                          "severity"
-                      ]
-                  ],
-                  use_container_width=True,
-                  hide_index=True
-                  )
+                st.divider()
+                
+                # Display most urgent shortages first
+                severity_order = {
+                    "🔴 Critical": 1,
+                    "🟠 High": 2,
+                    "🟡 Medium": 3,
+                    "🟢 Low": 4
+                }
+
+                shortages["priority"] = shortages["severity"].map(
+                    severity_order
+                )
+
+                shortages = shortages.sort_values("priority")
+
+                display_shortages = shortages[
+                    [
+                        "hospital",
+                        "blood_type",
+                        "closing_stock",
+                        "safety_stock",
+                        "average_daily_demand",
+                        "severity"
+                    ]
+                ].copy()
+
+                display_shortages["safety_stock"] = (
+                    display_shortages["safety_stock"].round(2)
+                )
+
+                display_shortages["average_daily_demand"] = (
+                    display_shortages["average_daily_demand"].round(2)
+                )
+
+                display_shortages = display_shortages.rename(columns={
+                    "hospital": "Hospital",
+                    "blood_type": "Blood Type",
+                    "closing_stock": "Current Stock",
+                    "safety_stock": "Safety Stock",
+                    "average_daily_demand": "Avg. Daily Demand",
+                    "severity": "Severity"
+                })
+
+                st.dataframe(
+                    display_shortages,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
         except requests.exceptions.RequestException as e:
             st.error(
@@ -232,8 +650,10 @@ try:
 # --------------------------------------------------
 # SUPPLIER AVAILABILITY SUMMARY
 # --------------------------------------------------
-
-                
+        st.markdown(
+            '<div id="suppliers"></div>',
+            unsafe_allow_html=True
+        )          
         st.divider()
         st.header("🏥 Supplier Availability Overview")
 
@@ -299,6 +719,10 @@ try:
   # ------------------------------------------
         # AI-POWERED DEMAND FORECASTING
   # ------------------------------------------
+        st.markdown(
+            '<div id="forecasting"></div>',
+            unsafe_allow_html=True
+        )
         st.divider()
 
         st.header("📈 AI-Powered Demand Forecasting")
@@ -551,7 +975,10 @@ except requests.exceptions.RequestException as e:
 # --------------------------------------------------
 # AI-POWERED HOSPITAL MATCHING RECOMMENDATIONS
 # --------------------------------------------------
-
+st.markdown(
+    '<div id="transfers"></div>',
+    unsafe_allow_html=True
+)
 st.divider()
 st.header("🤝 AI-Powered Blood Transfer Recommendations")
 
@@ -587,7 +1014,7 @@ if st.button("Find Matching Hospitals"):
         total_supplier_hospitals = len({
             supplier["supplier_hospital"]
             for item in recommendations
-            for supplier in item.get("recommended_suppliers", [])
+            for supplier in item.get("recommendations", [])
         })
 
         average_units_per_case = (
