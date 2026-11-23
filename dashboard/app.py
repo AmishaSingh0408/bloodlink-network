@@ -420,7 +420,7 @@ st.divider()
 try:
     response = requests.get(
         f"{API_URL}/inventory",
-        timeout=10
+        timeout=300
     )
     response.raise_for_status()
 
