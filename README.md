@@ -101,6 +101,9 @@ bloodlink-network/
 │   └── hospital_blood_data.csv # Generated synthetic inventory dataset
 ├── data_sim/
 │   └── generate_data.py        # Synthetic dataset generator
+├── docs/
+│   └── images/
+│       └── bloodlink-dashboard.png # Dashboard screenshot used in this README
 ├── .streamlit/
 ├── requirements.txt
 └── README.md
@@ -166,11 +169,9 @@ This prints the measured MAE along with training/test row counts and a sample se
 
 ## Screenshots
 
-A current dashboard screenshot can be added here after capturing the deployed Streamlit app. Save it as docs/images/bloodlink-dashboard.png and embed it with:
+The screenshot below shows the deployed dashboard overview. The displayed figures are generated from the project's synthetic demo dataset.
 
-~~~markdown
 ![BloodLink dashboard](docs/images/bloodlink-dashboard.png)
-~~~
 
 ## Limitations
 
