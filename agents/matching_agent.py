@@ -73,8 +73,9 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 
 # ============================================================
-# FIND SUPPLIER HOSPITALS
+# GET SURPLUS HOSPITALS
 # ============================================================
+
 
 def get_surplus_hospitals(
     df,
@@ -85,63 +86,37 @@ def get_surplus_hospitals(
     feature_columns
 ):
     """
-    Find hospitals that are predicted to have surplus blood
-    during the shortage period.
+    Find hospitals with previously calculated future surplus.
+    Reuses inventory_state to avoid repeated forecasting.
     """
 
     suppliers = []
 
-    # Get all hospitals except the shortage hospital.
     hospitals = df["hospital"].unique()
+
+    shortage_data = df[
+        df["hospital"] == shortage_hospital
+    ].iloc[-1]
 
     for hospital in hospitals:
 
         if hospital == shortage_hospital:
             continue
 
-        # Calculate projected inventory for this hospital.
-        projected = calculate_projected_inventory(
-            df,
-            model,
-            feature_columns,
-            hospital,
-            blood_type
-        )
+        key = (hospital, blood_type)
+        inventory = inventory_state.get(key)
 
-        if projected.empty:
+        if not inventory:
             continue
 
-        # ----------------------------------------------------
-        # Use the final day of the 7-day forecast
-        # ----------------------------------------------------
-
-        future = projected.iloc[-1]
-
-        projected_stock = future["projected_stock"]
-        safety_stock = future["safety_stock"]
-
-        future_surplus = (
-            projected_stock - safety_stock
-        )
+        future_surplus = inventory["surplus"]
 
         if future_surplus <= 0:
             continue
 
-        # ----------------------------------------------------
-        # Find hospital coordinates
-        # ----------------------------------------------------
-
         hospital_data = df[
             df["hospital"] == hospital
         ].iloc[-1]
-
-        shortage_data = df[
-            df["hospital"] == shortage_hospital
-        ].iloc[-1]
-
-        # ----------------------------------------------------
-        # Calculate distance
-        # ----------------------------------------------------
 
         distance = haversine_distance(
             shortage_data["lat"],
@@ -155,8 +130,8 @@ def get_surplus_hospitals(
             "city": hospital_data["city"],
             "lat": hospital_data["lat"],
             "lon": hospital_data["lon"],
-            "projected_stock": projected_stock,
-            "safety_stock": safety_stock,
+            "projected_stock": inventory["projected_stock"],
+            "safety_stock": inventory["safety_stock"],
             "surplus": future_surplus,
             "distance_km": distance
         })
@@ -275,11 +250,12 @@ def find_best_suppliers(
         key = (supplier_hospital, blood_type)
 
         # Get the supplier's latest available future surplus
-        future_surplus = inventory_state.get(
-            key,
-            supplier["surplus"]
-        )
+        inventory = inventory_state.get(key)
 
+        if not inventory:
+            continue
+
+        future_surplus = inventory["surplus"]
         if future_surplus <= 0:
             continue
 
@@ -293,7 +269,7 @@ def find_best_suppliers(
             continue
 
         # Update supplier inventory to prevent duplicate allocation
-        inventory_state[key] = max(
+        inventory_state[key]["surplus"] = max(
             0,
             future_surplus - transfer_units
         )
@@ -627,10 +603,15 @@ def generate_matching_results():
                     - latest_projection["safety_stock"]
                 )
 
-                inventory_state[(hospital, blood_type)] = int(
-                    future_surplus
-                )
-
+                inventory_state[(hospital, blood_type)] = {
+                    "surplus": int(future_surplus),
+                    "projected_stock": float(
+                        latest_projection["projected_stock"]
+                    ),
+                    "safety_stock": float(
+                        latest_projection["safety_stock"]
+                    )
+                }
         # Find forecasted shortages
     shortages = find_forecasted_shortages(
             df,
