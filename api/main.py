@@ -222,3 +222,42 @@ def matching_recommendations():
     }
 
     return jsonable_encoder(convert_numpy(response))
+
+# ------------------------------------------------------------
+# SIMULATED HOSPITAL COORDINATION
+# ------------------------------------------------------------
+
+from coordination_agent import (
+    build_transfer_requests,
+    list_transfer_requests,
+    decide_transfer_request,
+)
+
+
+@app.get("/coordination/requests")
+def get_coordination_requests():
+    """Return simulated transfer requests awaiting human review."""
+    matching = get_cached_matching_results()
+    requests = build_transfer_requests(matching["matching_results"])
+    return jsonable_encoder(convert_numpy(requests))
+
+
+@app.post("/coordination/requests/{request_id}/decision")
+def review_coordination_request(request_id: str, payload: dict):
+    """
+    Record an approval or rejection for a simulated request.
+    Approval is a workflow status only; no real transfer is initiated.
+    """
+    decision = payload.get("decision", "")
+    note = payload.get("note")
+    try:
+        result = decide_transfer_request(request_id, decision, note)
+    except ValueError as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if result is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Transfer request not found")
+
+    return jsonable_encoder(convert_numpy(result))
