@@ -6,6 +6,9 @@ from pathlib import Path
 import sys
 import numpy as np
 from fastapi.encoders import jsonable_encoder
+from services.email_service import send_email, send_transfer_notification
+from services.whatsapp_service import send_transfer_whatsapp_notification
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR / "agents"))
 from matching_agent import generate_matching_results
@@ -237,8 +240,59 @@ from coordination_agent import (
 @app.get("/coordination/requests")
 def get_coordination_requests():
     """Return simulated transfer requests awaiting human review."""
+
+    # Snapshot existing IDs before building requests
+    existing_requests = list_transfer_requests()
+    existing_ids = {
+        request["request_id"]
+        for request in existing_requests
+    }
+
     matching = get_cached_matching_results()
-    requests = build_transfer_requests(matching["matching_results"])
+
+    requests = build_transfer_requests(
+        matching["matching_results"]
+    )
+
+    # Identify requests newly created during this call
+    new_requests = [
+        request
+        for request in requests
+        if request["request_id"] not in existing_ids
+    ]
+
+    # Send one summary email only when new requests are created
+    if new_requests:
+        try:
+            summary_lines = [
+                f"- {request['shortage_hospital']} needs "
+                f"{request['recommended_units']} units of "
+                f"{request['blood_type']} from "
+                f"{request['supplier_hospital']} "
+                f"(Priority: {request['priority']})"
+                for request in new_requests
+            ]
+
+            email_body = (
+                "BloodLink Network - New Simulated Transfer Requests\\n\\n"
+                f"New requests created: {len(new_requests)}\\n\\n"
+                + "\\n".join(summary_lines)
+                + "\\n\\nThese are simulated recommendations. "
+                "No actual blood transfer has been initiated."
+            )
+
+            send_email(
+                subject="BloodLink: New Transfer Requests Generated",
+                body=email_body,
+            )
+
+        except Exception:
+            # Notification failure must never interrupt the API
+            import logging
+            logging.exception(
+                "Failed to send new transfer request notification"
+            )
+
     return jsonable_encoder(convert_numpy(requests))
 
 
@@ -248,16 +302,65 @@ def review_coordination_request(request_id: str, payload: dict):
     Record an approval or rejection for a simulated request.
     Approval is a workflow status only; no real transfer is initiated.
     """
+
     decision = payload.get("decision", "")
     note = payload.get("note")
+
     try:
-        result = decide_transfer_request(request_id, decision, note)
+        result = decide_transfer_request(
+            request_id,
+            decision,
+            note,
+        )
+
     except ValueError as exc:
         from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
 
     if result is None:
         from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Transfer request not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Transfer request not found",
+        )
+
+    # Send email notification
+    try:
+        send_transfer_notification(
+            request_id=result["request_id"],
+            shortage_hospital=result["shortage_hospital"],
+            supplier_hospital=result["supplier_hospital"],
+            blood_type=result["blood_type"],
+            units=result["recommended_units"],
+            status=result["status"],
+        )
+
+    except Exception:
+        import logging
+        logging.exception(
+            "Failed to send email notification for request %s",
+            request_id,
+        )
+
+    # Send WhatsApp notification
+    try:
+        send_transfer_whatsapp_notification(
+            request_id=result["request_id"],
+            shortage_hospital=result["shortage_hospital"],
+            supplier_hospital=result["supplier_hospital"],
+            blood_type=result["blood_type"],
+            units=result["recommended_units"],
+            status=result["status"],
+        )
+
+    except Exception:
+        import logging
+        logging.exception(
+            "Failed to send WhatsApp notification for request %s",
+            request_id,
+        )
 
     return jsonable_encoder(convert_numpy(result))
