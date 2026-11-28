@@ -237,11 +237,17 @@ from coordination_agent import (
 )
 
 
+
 @app.get("/coordination/requests")
 def get_coordination_requests():
-    """Return simulated transfer requests awaiting human review."""
+    """Retrieve saved simulated transfer requests."""
+    requests = list_transfer_requests()
+    return jsonable_encoder(convert_numpy(requests))
 
-    # Snapshot existing IDs before building requests
+@app.post("/coordination/requests/generate")
+def generate_coordination_requests():
+    """Generate simulated transfer requests and notify about new ones."""
+
     existing_requests = list_transfer_requests()
     existing_ids = {
         request["request_id"]
@@ -254,14 +260,12 @@ def get_coordination_requests():
         matching["matching_results"]
     )
 
-    # Identify requests newly created during this call
     new_requests = [
         request
         for request in requests
         if request["request_id"] not in existing_ids
     ]
 
-    # Send one summary email only when new requests are created
     if new_requests:
         try:
             summary_lines = [
@@ -274,10 +278,10 @@ def get_coordination_requests():
             ]
 
             email_body = (
-                "BloodLink Network - New Simulated Transfer Requests\\n\\n"
-                f"New requests created: {len(new_requests)}\\n\\n"
-                + "\\n".join(summary_lines)
-                + "\\n\\nThese are simulated recommendations. "
+                "BloodLink Network - New Simulated Transfer Requests\n\n"
+                f"New requests created: {len(new_requests)}\n\n"
+                + "\n".join(summary_lines)
+                + "\n\nThese are simulated recommendations. "
                 "No actual blood transfer has been initiated."
             )
 
@@ -287,7 +291,6 @@ def get_coordination_requests():
             )
 
         except Exception:
-            # Notification failure must never interrupt the API
             import logging
             logging.exception(
                 "Failed to send new transfer request notification"
