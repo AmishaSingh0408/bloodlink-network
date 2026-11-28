@@ -7,4 +7,5 @@ uvicorn
 streamlit
 prophet
 neo4j
-twilio
+python-dotenv==1.1.1
+twilio==9.11.0
